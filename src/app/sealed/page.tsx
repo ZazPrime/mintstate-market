@@ -54,6 +54,8 @@ export default async function SealedPage({
           rate, then multiply by the pack count. Fair value discounts that EV for liquidation
           friction (fees, shipping, time to sell). A negative gap means the sealed product is
           trading below the cards inside it. Confidence reflects how much of the set is priced.
+          EV counts base printings only — parallel and pattern variants (Poké Ball, Master Ball)
+          are not priced separately, so chase-heavy sets read as a larger premium than they are.
         </p>
       </div>
 

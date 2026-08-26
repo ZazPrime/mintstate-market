@@ -18,7 +18,8 @@
     "seed:sealed-demo": "tsx scripts/ingest/seed-sealed.ts",
     "ingest:market": "tsx scripts/ingest/market-worker.ts",
     "ingest:sealed": "tsx scripts/ingest/market-worker.ts --sealed-only",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:reclassify-sealed": "tsx scripts/db/reclassify-sealed.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
