@@ -14,7 +14,9 @@
     "ingest:population": "tsx scripts/ingest/population-worker.ts",
     "analytics:refresh": "tsx scripts/ingest/refresh-analytics.ts",
     "seed:demo": "tsx scripts/ingest/seed-demo-market.ts",
-    "seed:sealed": "tsx scripts/ingest/seed-sealed.ts",
+    "seed:sealed-demo": "tsx scripts/ingest/seed-sealed.ts",
+    "ingest:market": "tsx scripts/ingest/market-worker.ts",
+    "ingest:sealed": "tsx scripts/ingest/sealed-worker.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
