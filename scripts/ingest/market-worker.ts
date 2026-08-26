@@ -207,6 +207,7 @@ async function ingestSingles(
 
   const priceRows: unknown[][] = [];
   const mapRows: unknown[][] = [];
+  const snapshots = new Map<string, unknown[]>();
   const candidates: Array<{ cardId: string; tcgPlayerId: string; market: number }> = [];
   const chosen = new Map<string, { local: LocalCard; card: PptCard }>();
   const today = new Date().toISOString().slice(0, 10);
@@ -238,7 +239,7 @@ async function ingestSingles(
 
     const market = providerCard.prices?.market;
     if (typeof market !== 'number' || market <= 0) continue;
-    priceRows.push([
+    snapshots.set(local.id, [
       local.id, 'RAW', today, SOURCE, 'USD', 0,
       providerCard.prices?.low ?? null, market, null, market,
       providerCard.prices?.listings ?? providerCard.prices?.sellers ?? null,
@@ -258,7 +259,13 @@ async function ingestSingles(
     if (!card) continue;
     enriched += 1;
 
-    for (const point of rawSeries(card)) {
+    // The Near Mint series and the snapshot are two different measures of the
+    // same card and occasionally disagree by an order of magnitude, which reads
+    // as a one-day crash. The series wins so a card's history stays internally
+    // consistent; the snapshot only covers cards that were never enriched.
+    const series = rawSeries(card);
+    if (series.length > 0) snapshots.delete(target.cardId);
+    for (const point of series) {
       priceRows.push([
         target.cardId, 'RAW', point.date, SOURCE, 'USD', point.volume,
         null, point.price, null, point.price, null,
@@ -280,7 +287,7 @@ async function ingestSingles(
       'card_id', 'grade', 'observed_date', 'source', 'currency', 'sale_count',
       'low_price', 'median_price', 'high_price', 'avg_price', 'listing_count',
     ],
-    rows: dedupe(priceRows, [0, 1, 2, 3]),
+    rows: dedupe([...priceRows, ...Array.from(snapshots.values())], [0, 1, 2, 3]),
     conflictTarget: '(card_id, grade, observed_date, source)',
     updateColumns: [
       'sale_count', 'low_price', 'median_price', 'high_price', 'avg_price', 'listing_count',
