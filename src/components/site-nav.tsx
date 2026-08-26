@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 import {
   Activity,
+  Boxes,
   Calculator,
   Flame,
   Grid3x3,
@@ -21,6 +22,7 @@ const LINKS = [
   { href: '/movers', label: 'Movers', icon: Flame },
   { href: '/heatmap', label: 'Demand', icon: Grid3x3 },
   { href: '/sealed', label: 'Sealed', icon: Package },
+  { href: '/sealed-ev', label: 'Pack EV', icon: Boxes },
   { href: '/fair-value', label: 'Fair Value', icon: Sparkles },
   { href: '/arbitrage', label: 'Grading Arbitrage', icon: Calculator },
   { href: '/market-index', label: 'Market Index', icon: LineChart },

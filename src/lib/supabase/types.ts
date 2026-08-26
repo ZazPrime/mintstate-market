@@ -181,3 +181,62 @@ export interface ValuationDrivers {
   trade_pace_score: number | null;
   composite_score: number | null;
 }
+
+export interface CardIntelligenceRow {
+  card_id: string;
+  card_name: string;
+  set_name: string;
+  market_price_raw: number | null;
+  fair_value_raw: number | null;
+  momentum_30d: number | null;
+  volatility_90d: number | null;
+  demand_score: number | null;
+  scarcity_score: number | null;
+  liquidity_score: number | null;
+  composite_score: number | null;
+  investment_grade: InvestmentGrade | null;
+  gem_rate: number | null;
+  pop_total: number | null;
+  low_6m: number | null;
+  high_6m: number | null;
+  range_position: number | null;
+  last3_comp_avg: number | null;
+  last_sold_date: string | null;
+  sales_30d: number;
+  sales_7d: number;
+  sales_prev_7d: number;
+  active_days_30d: number;
+  active_listings: number | null;
+  listings_prior_7d: number | null;
+  psa9_price: number | null;
+  psa10_price: number | null;
+  grade_ladder_step: number | null;
+}
+
+export interface GradeDistributionRow {
+  card_id: string;
+  snapshot_date: string;
+  total_graded: number;
+  gem_rate: number | null;
+  psa10: number;
+  psa9: number;
+  psa8: number;
+  psa7: number;
+  psa6_and_below: number;
+}
+
+export interface PackEvRow {
+  set_id: string;
+  set_name: string;
+  release_date: string | null;
+  era: string;
+  ev_per_pack: number | null;
+  priced_card_share: number | null;
+  chase_cards: number | null;
+  gem_rate: number | null;
+  pack_price: number | null;
+  ev_net: number | null;
+  per_pack_gap: number | null;
+  roi_pct: number | null;
+  top3_chase_share: number | null;
+}

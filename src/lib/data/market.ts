@@ -4,9 +4,12 @@ import { createPublicSupabase } from '@/lib/supabase/server';
 import type {
   BenchmarkPoint,
   CardAnalyticsRow,
+  CardIntelligenceRow,
   DemandCell,
+  GradeDistributionRow,
   IndexPoint,
   MoverRow,
+  PackEvRow,
   PopulationPoint,
   PricePoint,
   SealedGapRow,
@@ -375,6 +378,59 @@ export async function getValuationDrivers(cardId: string): Promise<ValuationDriv
     .maybeSingle();
   if (error) throw new Error(`valuation drivers: ${error.message}`);
   return data ? withNumbers<ValuationDrivers>(data, DRIVER_NUMERIC) : null;
+}
+
+const INTELLIGENCE_NUMERIC = [
+  'market_price_raw', 'fair_value_raw', 'momentum_30d', 'volatility_90d', 'demand_score',
+  'scarcity_score', 'liquidity_score', 'composite_score', 'gem_rate', 'pop_total',
+  'low_6m', 'high_6m', 'range_position', 'last3_comp_avg', 'sales_30d', 'sales_7d',
+  'sales_prev_7d', 'active_days_30d', 'active_listings', 'listings_prior_7d',
+  'psa9_price', 'psa10_price', 'grade_ladder_step',
+];
+
+export async function getCardIntelligence(cardId: string): Promise<CardIntelligenceRow | null> {
+  const supabase = createPublicSupabase();
+  const { data, error } = await supabase
+    .from('card_intelligence')
+    .select('*')
+    .eq('card_id', cardId)
+    .maybeSingle();
+  if (error) throw new Error(`card intelligence: ${error.message}`);
+  return data ? withNumbers<CardIntelligenceRow>(data, INTELLIGENCE_NUMERIC) : null;
+}
+
+const DISTRIBUTION_NUMERIC = [
+  'total_graded', 'gem_rate', 'psa10', 'psa9', 'psa8', 'psa7', 'psa6_and_below',
+];
+
+export async function getGradeDistribution(cardId: string): Promise<GradeDistributionRow | null> {
+  const supabase = createPublicSupabase();
+  const { data, error } = await supabase
+    .from('card_grade_distribution')
+    .select('*')
+    .eq('card_id', cardId)
+    .maybeSingle();
+  if (error) throw new Error(`grade distribution: ${error.message}`);
+  return data ? withNumbers<GradeDistributionRow>(data, DISTRIBUTION_NUMERIC) : null;
+}
+
+const PACK_EV_NUMERIC = [
+  'ev_per_pack', 'priced_card_share', 'chase_cards', 'gem_rate', 'pack_price',
+  'ev_net', 'per_pack_gap', 'roi_pct', 'top3_chase_share',
+];
+
+export type PackEvSort = 'roi' | 'ev' | 'pack_price';
+
+export async function getPackEvBoard(sort: PackEvSort = 'roi'): Promise<PackEvRow[]> {
+  const supabase = createPublicSupabase();
+  const column = sort === 'ev' ? 'ev_net' : sort === 'pack_price' ? 'pack_price' : 'roi_pct';
+  const { data, error } = await supabase
+    .from('set_pack_ev_board')
+    .select('*')
+    .order(column, { ascending: false, nullsFirst: false })
+    .limit(200);
+  if (error) throw new Error(`pack ev board: ${error.message}`);
+  return (data ?? []).map((row) => withNumbers<PackEvRow>(row, PACK_EV_NUMERIC));
 }
 
 export interface MarketSummary {

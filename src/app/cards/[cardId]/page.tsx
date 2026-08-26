@@ -1,23 +1,29 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 
+import { CardIntelligenceBar } from '@/components/card-intelligence-bar';
 import { CardPriceChart } from '@/components/card-price-chart';
 import { FilterTabs, WINDOW_LABEL, WINDOW_OPTIONS } from '@/components/filter-tabs';
 import { GradeBadge } from '@/components/grade-badge';
+import { GradeDistribution } from '@/components/grade-distribution';
+import { InvestmentScoreWidget } from '@/components/investment-score';
 import { PopulationChart } from '@/components/population-chart';
 import { StatCard } from '@/components/stat-card';
+import { SupplyDemandRadar } from '@/components/supply-demand-radar';
 import { ValuationBreakdown } from '@/components/valuation-breakdown';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { dailyVolume, gradingEdge } from '@/lib/analytics/card-intelligence';
 import {
   getCardAnalytics,
+  getCardIntelligence,
   getCardPopulation,
   getCardPriceHistory,
+  getGradeDistribution,
   getValuationDrivers,
 } from '@/lib/data/market';
 import { formatCompact, formatCurrency, formatDate, formatPercent } from '@/lib/format';
 import type { WindowKey } from '@/lib/supabase/types';
-import { cn } from '@/lib/utils';
 
 export const revalidate = 900;
 
@@ -30,12 +36,6 @@ const WINDOW_DAYS: Record<WindowKey, number> = {
   '365d': 365,
   all: 3650,
 };
-
-const SCORES: Array<{ key: 'demand_score' | 'liquidity_score' | 'scarcity_score'; label: string; hint: string }> = [
-  { key: 'demand_score', label: 'Demand', hint: 'Sales velocity and price appreciation' },
-  { key: 'liquidity_score', label: 'Liquidity', hint: 'Depth and consistency of the sold-listing flow' },
-  { key: 'scarcity_score', label: 'Scarcity', hint: 'Graded population relative to comparable cards' },
-];
 
 export async function generateMetadata({ params }: { params: { cardId: string } }) {
   const analytics = await getCardAnalytics(params.cardId);
@@ -51,17 +51,28 @@ export default async function CardPage({
 }) {
   const window = (WINDOWS.find((w) => w === searchParams.window) ?? '90d') as WindowKey;
 
-  const [analytics, history, population, drivers] = await Promise.all([
+  const [analytics, history, recent, population, drivers, intel, distribution] = await Promise.all([
     getCardAnalytics(params.cardId),
     getCardPriceHistory(params.cardId, WINDOW_DAYS[window]),
+    getCardPriceHistory(params.cardId, 30),
     getCardPopulation(params.cardId),
     getValuationDrivers(params.cardId),
+    getCardIntelligence(params.cardId),
+    getGradeDistribution(params.cardId),
   ]);
 
   if (!analytics) notFound();
 
   const image = analytics.images?.large ?? analytics.images?.small;
   const latestPop = population.at(-1);
+  const edge = intel
+    ? gradingEdge({
+        raw: intel.market_price_raw,
+        psa10: intel.psa10_price,
+        gemRate: intel.gem_rate,
+      })
+    : null;
+  const volume = dailyVolume(recent);
 
   return (
     <div className="space-y-6">
@@ -130,33 +141,23 @@ export default async function CardPage({
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            {SCORES.map((score) => {
-              const value = analytics[score.key] ?? 0;
-              return (
-                <div key={score.key} className="rounded-lg border border-border/70 bg-card/60 p-3">
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {score.label}
-                    </p>
-                    <p className="tabular text-sm font-medium">{value.toFixed(0)}</p>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className={cn(
-                        'h-full rounded-full',
-                        value >= 66 ? 'bg-emerald-400' : value >= 33 ? 'bg-amber-400' : 'bg-rose-400',
-                      )}
-                      style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{score.hint}</p>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
+
+      {intel && <CardIntelligenceBar intel={intel} />}
+
+      {intel && (
+        <div className="grid gap-5 xl:grid-cols-[1fr,2fr]">
+          <InvestmentScoreWidget
+            intel={intel}
+            window={window}
+            gradingEdgeRoi={edge?.roi ?? null}
+          />
+          <SupplyDemandRadar intel={intel} volume={volume} />
+        </div>
+      )}
+
+      {intel && <GradeDistribution intel={intel} distribution={distribution} />}
 
       {drivers && <ValuationBreakdown drivers={drivers} />}
 
