@@ -16,11 +16,10 @@ never hit a third-party pricing API. The frontend reads only from Supabase.
 
 ```
 pokemon-tcg-data (GitHub bulk JSON) ─┐
-TCGdex (Japanese sets)               ├─> sets / cards
-eBay Browse + Marketplace Insights  ─┼─> price_history ─┐
-PSA population pages (Playwright)   ─┴─> population_reports ─┼─> refresh_card_analytics()
-                                                              └─> card_analytics ─> Next.js
-                                                                  market_index_history
+TCGdex (Japanese sets)               ├─> sets / cards              ─┐
+PokemonPriceTracker v2 (raw + PSA    ├─> price_history, sealed_*    ├─> refresh_card_analytics()
+  10/9 comps, sealed products)       │                              │   card_analytics ─> Next.js
+PSA population pages (Playwright)    ┴─> population_reports        ─┘   market_index_history
 ```
 
 ### Schema (`supabase/migrations`)
@@ -43,13 +42,11 @@ volatility scores.
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in Supabase + eBay credentials
+cp .env.example .env.local   # fill in Supabase + PokemonPriceTracker credentials
 npm run db:migrate           # apply migrations to DATABASE_URL
 npm run seed:metadata        # English sets/cards from pokemon-tcg-data
 npm run seed:metadata -- --japanese
-npm run ingest:market        # real singles prices from JustTCG
-npm run ingest:sealed        # sealed catalogue + prices from tcgapi.dev
-npm run ingest:prices        # eBay sold listings (requires eBay credentials)
+npm run ingest:market        # singles + sealed market data (one sweep)
 npm run ingest:population    # Playwright, no credentials needed
 npm run analytics:refresh    # rebuild card_analytics + the MSM 100 index
 npm run dev
@@ -59,17 +56,24 @@ Without any credentials, `npm run seed:demo` and `npm run seed:sealed-demo` gene
 synthetic price, population and benchmark data (rows are tagged `synthetic`) so the UI can be
 exercised end to end.
 
-### Pricing sources
+### Pricing source
 
-| Source | Feeds | Semantics |
+`npm run ingest:market` is the single ingestion service, backed by PokemonPriceTracker v2:
+
+| Feed | Table | Semantics |
 | --- | --- | --- |
-| JustTCG (`ingest:market`) | `price_history` raw singles, with the provider's rolling daily history | TCGplayer-derived market prices — `sale_count` stays 0 |
-| tcgapi.dev (`ingest:sealed`) | `sealed_products`, `sealed_price_history` (booster boxes, ETBs, bundles, cases) | market/low/median price plus `listing_count` |
-| eBay (`ingest:prices`) | `price_history` raw + PSA 10 | actual sold listings, so it populates `sale_count` |
+| TCGplayer Near Mint market series | `price_history` (`RAW`) | daily market price + sales volume |
+| eBay sold comps by grade | `price_history` (`PSA10`, `PSA9`) | daily average of completed sales, `sale_count` = sales |
+| Sealed catalogue + unopened price series | `sealed_products`, `sealed_price_history` | booster boxes, ETBs, bundles, cases |
 
-Both catalogue providers cap the free tier at 100 requests/day, so each worker takes a `--budget`
-and persists its position in `ingest_cursor`; consecutive daily runs sweep the whole catalogue.
-Provider ids are mapped onto local sets/cards/products in the `external_*_map` tables.
+Quota is measured in API calls, not HTTP requests: a card costs 3 calls with history and eBay data,
+and the plan allows 20,000/day. Pages are fetched 200 at a time, the client tracks the spend the
+API reports, and the sweep position is persisted in `ingest_cursor` so consecutive runs continue
+through the catalogue. Provider ids are mapped onto local sets/cards/products in the
+`external_*_map` tables.
+
+Pack counts are not part of the sealed feed and are derived from the product name and release era
+(`scripts/lib/sealed-classify.ts`); they drive the pull-EV model, not the observed prices.
 
 ### Environment
 
@@ -78,10 +82,7 @@ Provider ids are mapped onto local sets/cards/products in the `external_*_map` t
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public/publishable key used by the frontend |
 | `DATABASE_URL` | Postgres connection used by migrations and workers |
-| `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` | eBay OAuth client credentials |
-| `EBAY_ENV` | `production` or `sandbox` |
-| `JUSTTCG_API_KEY` | JustTCG key for singles pricing |
-| `TCGAPI_KEY` | tcgapi.dev key for the sealed catalogue |
+| `POKEMON_PRICE_TRACKER_API_KEY` | PokemonPriceTracker v2 key used by the ingestion service |
 
 ### Scheduling
 
@@ -89,8 +90,6 @@ The workers are plain Node entrypoints, so any scheduler works (cron, GitHub Act
 
 ```
 0 5 * * *   npm run ingest:market
-15 5 * * *  npm run ingest:sealed
-0 6 * * *   npm run ingest:prices
 0 7 * * 0   npm run ingest:population
 30 7 * * *  npm run analytics:refresh
 ```
@@ -112,9 +111,8 @@ The workers are plain Node entrypoints, so any scheduler works (cron, GitHub Act
 | --- | --- |
 | `npm run db:migrate [-- --local]` | Apply migrations (checksummed, transactional) |
 | `npm run seed:metadata [-- --japanese] [-- --sets=a,b]` | Seed sets and cards |
-| `npm run ingest:market [-- --budget=60] [-- --sets=a,b]` | JustTCG singles pricing (resumable) |
-| `npm run ingest:sealed [-- --budget=40]` | tcgapi.dev sealed catalogue + pricing (resumable) |
-| `npm run ingest:prices [-- --limit=250]` | eBay sold-listing ingestion |
+| `npm run ingest:market [-- --budget=15000] [-- --days=90] [-- --sets=a,b] [-- --refresh]` | Singles + sealed ingestion (resumable) |
+| `npm run ingest:sealed` | Same worker, sealed products only |
 | `npm run ingest:population [-- --limit=50] [-- --headed]` | PSA population scraper |
 | `npm run analytics:refresh` | Recompute analytics and the index |
 | `npm run seed:demo` / `npm run seed:sealed-demo` | Synthetic market data for local development |

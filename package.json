@@ -10,13 +10,14 @@
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:reset:local": "tsx scripts/db/reset-local.ts",
     "seed:metadata": "tsx scripts/ingest/seed-metadata.ts",
-    "ingest:prices": "tsx scripts/ingest/pricing-worker.ts",
+    "db:purge-synthetic": "tsx scripts/db/purge-synthetic.ts",
+    "ingest:benchmark": "tsx scripts/ingest/benchmark-worker.ts",
     "ingest:population": "tsx scripts/ingest/population-worker.ts",
     "analytics:refresh": "tsx scripts/ingest/refresh-analytics.ts",
     "seed:demo": "tsx scripts/ingest/seed-demo-market.ts",
     "seed:sealed-demo": "tsx scripts/ingest/seed-sealed.ts",
     "ingest:market": "tsx scripts/ingest/market-worker.ts",
-    "ingest:sealed": "tsx scripts/ingest/sealed-worker.ts",
+    "ingest:sealed": "tsx scripts/ingest/market-worker.ts --sealed-only",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -104,8 +104,8 @@ export default async function SealedPage({
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Sealed clearing prices are synthetic demo data until a sealed price feed is connected; pull
-        EV is computed from real card prices in the database.
+        Sealed market prices come from the PokemonPriceTracker feed; pull EV is computed from the
+        ingested card prices and rarity pull rates.
       </p>
     </div>
   );

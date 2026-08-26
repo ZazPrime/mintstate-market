@@ -12,6 +12,23 @@ export function setKey(name: string): string {
   return normalizeKey(withoutPrefix);
 }
 
+/**
+ * Provider set names sometimes keep the series inside the title
+ * ("SV: Scarlet & Violet 151" for the set stored as "151"), so matching tries
+ * the plain key first and then the key with a leading series name stripped.
+ */
+export function setKeyCandidates(name: string): string[] {
+  const base = setKey(name);
+  const series = [
+    'scarletandviolet', 'swordandshield', 'sunandmoon', 'blackandwhite',
+    'heartgoldsoulsilver', 'diamondandpearl', 'pokemon',
+  ];
+  const stripped = series
+    .filter((prefix) => base.startsWith(prefix) && base.length > prefix.length)
+    .map((prefix) => base.slice(prefix.length));
+  return [base, ...stripped];
+}
+
 export function normalizeKey(value: string): string {
   return value
     .toLowerCase()

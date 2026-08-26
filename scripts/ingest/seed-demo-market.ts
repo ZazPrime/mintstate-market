@@ -1,6 +1,6 @@
 /**
  * Generates synthetic price and population history so the analytics layer and
- * frontend can be exercised before live eBay/PSA credentials are available.
+ * frontend can be exercised before live pricing/PSA credentials are available.
  *
  * Every row is written with source `synthetic` / a synthetic source_url, so it
  * can be deleted in one statement once real ingestion takes over:
