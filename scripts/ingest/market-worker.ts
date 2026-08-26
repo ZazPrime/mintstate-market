@@ -221,13 +221,21 @@ async function main(): Promise<void> {
     }
   }
 
+  // Several provider printings can resolve to the same local card, so collapse
+  // to one row per conflict key before upserting.
+  const dedupe = (rows: unknown[][], keyIndexes: number[]): unknown[][] => {
+    const byKey = new Map<string, unknown[]>();
+    for (const row of rows) byKey.set(keyIndexes.map((i) => String(row[i])).join('|'), row);
+    return Array.from(byKey.values());
+  };
+
   const writtenPrices = await bulkUpsert({
     table: 'public.price_history',
     columns: [
       'card_id', 'grade', 'observed_date', 'source', 'currency', 'sale_count',
       'low_price', 'median_price', 'high_price', 'avg_price',
     ],
-    rows: priceRows,
+    rows: dedupe(priceRows, [0, 1, 2, 3]),
     conflictTarget: '(card_id, grade, observed_date, source)',
     updateColumns: ['sale_count', 'low_price', 'median_price', 'high_price', 'avg_price'],
   });
@@ -235,7 +243,7 @@ async function main(): Promise<void> {
   await bulkUpsert({
     table: 'public.external_card_map',
     columns: ['source', 'external_id', 'card_id', 'external_name'],
-    rows: cardMapRows,
+    rows: dedupe(cardMapRows, [0, 1]),
     conflictTarget: '(source, external_id)',
     updateColumns: ['card_id', 'external_name'],
   });
