@@ -3,13 +3,24 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Activity, Calculator, LineChart, Sparkles } from 'lucide-react';
+import {
+  Activity,
+  Calculator,
+  Flame,
+  Grid3x3,
+  LineChart,
+  Package,
+  Sparkles,
+} from 'lucide-react';
 
 import { CardSearch } from '@/components/card-search';
 import { cn } from '@/lib/utils';
 
 const LINKS = [
   { href: '/', label: 'Overview', icon: Activity },
+  { href: '/movers', label: 'Movers', icon: Flame },
+  { href: '/heatmap', label: 'Demand', icon: Grid3x3 },
+  { href: '/sealed', label: 'Sealed', icon: Package },
   { href: '/fair-value', label: 'Fair Value', icon: Sparkles },
   { href: '/arbitrage', label: 'Grading Arbitrage', icon: Calculator },
   { href: '/market-index', label: 'Market Index', icon: LineChart },

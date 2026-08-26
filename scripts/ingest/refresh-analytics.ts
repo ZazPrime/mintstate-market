@@ -1,6 +1,7 @@
 /**
- * Recomputes the daily analytics rollup and the chain-linked market index.
- * Runs after the pricing and population workers.
+ * Recomputes the daily analytics rollup, the multi-window (30D/90D/1Y/ALL)
+ * metrics, sealed valuations and the chain-linked market index. Runs after the
+ * pricing and population workers.
  *
  *   npm run analytics:refresh
  */
@@ -12,6 +13,16 @@ async function main() {
     'select public.refresh_card_analytics() as refresh_card_analytics',
   );
   log.info(`card_analytics rows written: ${analytics.rows[0].refresh_card_analytics}`);
+
+  const windows = await getPool().query<{ refresh_window_metrics: number }>(
+    'select public.refresh_window_metrics() as refresh_window_metrics',
+  );
+  log.info(`card_window_metrics rows written: ${windows.rows[0].refresh_window_metrics}`);
+
+  const sealed = await getPool().query<{ refresh_sealed_analytics: number }>(
+    'select public.refresh_sealed_analytics() as refresh_sealed_analytics',
+  );
+  log.info(`sealed_analytics rows written: ${sealed.rows[0].refresh_sealed_analytics}`);
 
   // Keep the index basket at the 100 most liquid cards with PSA 10 pricing.
   await getPool().query(`

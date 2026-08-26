@@ -2,20 +2,34 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 
 import { CardPriceChart } from '@/components/card-price-chart';
+import { FilterTabs, WINDOW_LABEL, WINDOW_OPTIONS } from '@/components/filter-tabs';
 import { GradeBadge } from '@/components/grade-badge';
 import { PopulationChart } from '@/components/population-chart';
 import { StatCard } from '@/components/stat-card';
+import { ValuationBreakdown } from '@/components/valuation-breakdown';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   getCardAnalytics,
   getCardPopulation,
   getCardPriceHistory,
+  getValuationDrivers,
 } from '@/lib/data/market';
 import { formatCompact, formatCurrency, formatDate, formatPercent } from '@/lib/format';
+import type { WindowKey } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 
 export const revalidate = 900;
+
+const WINDOWS: WindowKey[] = ['30d', '90d', '365d', 'all'];
+
+/** Days of history to load per selected window; ALL spans a decade of data. */
+const WINDOW_DAYS: Record<WindowKey, number> = {
+  '30d': 30,
+  '90d': 90,
+  '365d': 365,
+  all: 3650,
+};
 
 const SCORES: Array<{ key: 'demand_score' | 'liquidity_score' | 'scarcity_score'; label: string; hint: string }> = [
   { key: 'demand_score', label: 'Demand', hint: 'Sales velocity and price appreciation' },
@@ -28,11 +42,20 @@ export async function generateMetadata({ params }: { params: { cardId: string } 
   return { title: analytics ? `${analytics.card_name} — Card Intelligence` : 'Card Intelligence' };
 }
 
-export default async function CardPage({ params }: { params: { cardId: string } }) {
-  const [analytics, history, population] = await Promise.all([
+export default async function CardPage({
+  params,
+  searchParams,
+}: {
+  params: { cardId: string };
+  searchParams: { window?: string };
+}) {
+  const window = (WINDOWS.find((w) => w === searchParams.window) ?? '90d') as WindowKey;
+
+  const [analytics, history, population, drivers] = await Promise.all([
     getCardAnalytics(params.cardId),
-    getCardPriceHistory(params.cardId, 180),
+    getCardPriceHistory(params.cardId, WINDOW_DAYS[window]),
     getCardPopulation(params.cardId),
+    getValuationDrivers(params.cardId),
   ]);
 
   if (!analytics) notFound();
@@ -133,10 +156,25 @@ export default async function CardPage({ params }: { params: { cardId: string } 
         </div>
       </div>
 
+      {drivers && <ValuationBreakdown drivers={drivers} />}
+
       <div className="grid gap-5 xl:grid-cols-[3fr,2fr]">
         <Card className="border-border/70">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Clearing prices &amp; volume</CardTitle>
+          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-2">
+            <CardTitle className="text-base">
+              Clearing prices &amp; volume
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {WINDOW_LABEL[window]}
+              </span>
+            </CardTitle>
+            <FilterTabs
+              basePath={`/cards/${params.cardId}`}
+              param="window"
+              options={WINDOW_OPTIONS}
+              active={window}
+              params={{ window }}
+              size="sm"
+            />
           </CardHeader>
           <CardContent>
             <CardPriceChart history={history} />

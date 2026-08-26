@@ -4,10 +4,16 @@ import { createPublicSupabase } from '@/lib/supabase/server';
 import type {
   BenchmarkPoint,
   CardAnalyticsRow,
+  DemandCell,
   IndexPoint,
+  MoverRow,
   PopulationPoint,
   PricePoint,
+  SealedGapRow,
   SparklinePoint,
+  TrackedGrade,
+  ValuationDrivers,
+  WindowKey,
 } from '@/lib/supabase/types';
 
 /** PostgREST can hand back numerics as strings depending on column type. */
@@ -198,6 +204,174 @@ export async function getBenchmarkSeries(symbol = 'SPX'): Promise<BenchmarkPoint
     observed_date: row.observed_date as string,
     close_value: num(row.close_value) ?? 0,
   }));
+}
+
+/** Coerces the listed PostgREST numeric columns to numbers in place. */
+function withNumbers<T>(row: Record<string, unknown>, keys: string[]): T {
+  const output: Record<string, unknown> = { ...row };
+  for (const key of keys) output[key] = num(row[key]);
+  return output as T;
+}
+
+function normalizeSparkline(value: unknown): SparklinePoint[] {
+  if (!Array.isArray(value)) return [];
+  return (value as SparklinePoint[]).map((point) => ({ d: point.d, p: num(point.p) ?? 0 }));
+}
+
+const MOVER_NUMERIC = [
+  'start_price', 'end_price', 'change_pct', 'low_price', 'high_price', 'median_price',
+  'sales_total', 'velocity', 'coverage', 'volatility', 'observation_days',
+];
+
+export type MoverDirection = 'risers' | 'fallers';
+
+export interface MoversQuery {
+  window?: WindowKey;
+  grade?: TrackedGrade;
+  era?: string;
+  direction?: MoverDirection;
+  /** Ignore illiquid cards whose "move" is one stale sale. */
+  minSales?: number;
+  limit?: number;
+}
+
+export async function getMovers(query: MoversQuery = {}): Promise<MoverRow[]> {
+  const {
+    window = '30d',
+    grade = 'RAW',
+    era,
+    direction = 'risers',
+    minSales = 5,
+    limit = 25,
+  } = query;
+
+  const supabase = createPublicSupabase();
+  let request = supabase
+    .from('card_movers')
+    .select('*')
+    .eq('window_key', window)
+    .eq('grade', grade)
+    .gte('sales_total', minSales)
+    .not('change_pct', 'is', null)
+    .limit(limit);
+
+  if (era && era !== 'all') request = request.eq('era', era);
+  request = request.order('change_pct', { ascending: direction === 'fallers' });
+
+  const { data, error } = await request;
+  if (error) throw new Error(`movers (${direction}): ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...withNumbers<MoverRow>(row, MOVER_NUMERIC),
+    sparkline: normalizeSparkline(row.sparkline),
+  }));
+}
+
+export async function getEras(): Promise<string[]> {
+  const supabase = createPublicSupabase();
+  const { data, error } = await supabase
+    .from('card_movers')
+    .select('era, release_date')
+    .eq('window_key', '30d')
+    .eq('grade', 'RAW');
+  if (error) throw new Error(`eras: ${error.message}`);
+
+  const seen = new Map<string, string>();
+  for (const row of data ?? []) {
+    const era = row.era as string;
+    const release = (row.release_date as string | null) ?? '';
+    const earliest = seen.get(era);
+    if (earliest === undefined || release < earliest) seen.set(era, release);
+  }
+  return Array.from(seen.entries())
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .map(([era]) => era);
+}
+
+const DEMAND_NUMERIC = [
+  'velocity_30d', 'velocity_90d', 'velocity_365d', 'coverage_365d', 'coverage_90d',
+  'sales_365d', 'sales_30d', 'change_30d', 'change_90d', 'change_365d', 'change_all',
+  'end_price', 'pace_ratio',
+];
+
+export interface DemandQuery {
+  grade?: TrackedGrade;
+  era?: string;
+  window?: WindowKey;
+  limit?: number;
+}
+
+export async function getDemandGrid(query: DemandQuery = {}): Promise<DemandCell[]> {
+  const { grade = 'RAW', era, window = '30d', limit = 240 } = query;
+  const orderColumn =
+    window === '30d' ? 'sales_30d' : window === '90d' ? 'velocity_90d' : 'sales_365d';
+
+  const supabase = createPublicSupabase();
+  let request = supabase
+    .from('card_demand_profile')
+    .select('*')
+    .eq('grade', grade)
+    .order(orderColumn, { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (era && era !== 'all') request = request.eq('era', era);
+
+  const { data, error } = await request;
+  if (error) throw new Error(`demand grid: ${error.message}`);
+  return (data ?? []).map((row) => withNumbers<DemandCell>(row, DEMAND_NUMERIC));
+}
+
+const SEALED_NUMERIC = [
+  'market_price', 'ev_per_pack', 'pull_ev', 'fair_value', 'gap_pct',
+  'priced_card_share', 'chase_card_count', 'msrp', 'packs_per_product',
+];
+
+export interface SealedQuery {
+  productType?: string;
+  era?: string;
+  sort?: 'discount' | 'premium' | 'value';
+  limit?: number;
+}
+
+export async function getSealedGaps(query: SealedQuery = {}): Promise<SealedGapRow[]> {
+  const { productType, era, sort = 'discount', limit = 120 } = query;
+  const supabase = createPublicSupabase();
+
+  let request = supabase
+    .from('sealed_value_gap')
+    .select('*')
+    .not('gap_pct', 'is', null)
+    .limit(limit);
+
+  if (productType && productType !== 'all') request = request.eq('product_type', productType);
+  if (era && era !== 'all') request = request.eq('era', era);
+
+  if (sort === 'premium') request = request.order('gap_pct', { ascending: false });
+  else if (sort === 'value') request = request.order('pull_ev', { ascending: false });
+  else request = request.order('gap_pct', { ascending: true });
+
+  const { data, error } = await request;
+  if (error) throw new Error(`sealed value gap: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...withNumbers<SealedGapRow>(row, SEALED_NUMERIC),
+    sparkline: normalizeSparkline(row.sparkline),
+  }));
+}
+
+const DRIVER_NUMERIC = [
+  'market_price_raw', 'market_price_psa10', 'gem_rate', 'pop_total', 'sales_30d',
+  'pull_cost', 'pack_price', 'packs_per_hit', 'peer_median_price', 'peer_count',
+  'character_multiplier', 'character_median_price', 'character_card_count',
+  'gem_adjusted_value', 'psa10_multiple', 'trade_pace_score', 'composite_score',
+];
+
+export async function getValuationDrivers(cardId: string): Promise<ValuationDrivers | null> {
+  const supabase = createPublicSupabase();
+  const { data, error } = await supabase
+    .from('card_valuation_drivers')
+    .select('*')
+    .eq('card_id', cardId)
+    .maybeSingle();
+  if (error) throw new Error(`valuation drivers: ${error.message}`);
+  return data ? withNumbers<ValuationDrivers>(data, DRIVER_NUMERIC) : null;
 }
 
 export interface MarketSummary {

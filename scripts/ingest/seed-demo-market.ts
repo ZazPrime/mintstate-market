@@ -63,7 +63,8 @@ async function main() {
       where c.language = 'en'
         and c.rarity is not null
         and c.rarity not in ('Common', 'Uncommon')
-      order by s.release_date desc nulls last, c.id
+      -- Deterministic spread across sets and eras rather than newest-first.
+      order by md5(c.id)
       limit $1`,
     [cardCount],
   );
@@ -85,11 +86,20 @@ async function main() {
     const psaMultiple = 3 + rng() * 6;
     const drift = (rng() - 0.45) * 0.004;
     const vol = 0.02 + rng() * 0.05;
+    // Liquidity profile: how often the card actually trades, and how much of
+    // the window it has been trading for. Drives the persistence tiers.
+    const tradeOdds = 0.08 + rng() ** 1.6 * 0.92;
+    const historyDays = rng() < 0.18 ? Math.floor(45 + rng() * 90) : days;
+    // Recent flow can diverge from the baseline, producing accelerating and
+    // cooling trajectories rather than one flat pace.
+    const paceShift = 0.4 + rng() * 1.8;
 
-    for (let offset = days; offset >= 0; offset -= 1) {
+    for (let offset = Math.min(days, historyDays); offset >= 0; offset -= 1) {
       const date = new Date(today.getTime() - offset * 86_400_000).toISOString().slice(0, 10);
       rawPrice = Math.max(1, rawPrice * (1 + drift + (rng() - 0.5) * vol));
       const psa10Price = rawPrice * psaMultiple;
+      const odds = Math.min(1, tradeOdds * (offset <= 45 ? paceShift : 1));
+      if (rng() > odds) continue;
 
       for (const [grade, price] of [['RAW', rawPrice], ['PSA10', psa10Price]] as const) {
         const sales = 1 + Math.floor(rng() * (grade === 'RAW' ? 12 : 4));

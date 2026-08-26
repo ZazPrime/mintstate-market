@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   Area,
@@ -18,22 +18,19 @@ import {
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_STYLE } from '@/components/chart-theme';
 import { formatCurrency, formatDate } from '@/lib/format';
 import type { PricePoint } from '@/lib/supabase/types';
-import { cn } from '@/lib/utils';
 
-const RANGES = [30, 90, 180];
-
+/**
+ * Clearing-price history for whichever window the page selected — the series
+ * is whatever the server handed down, so the axis rescales with the window.
+ */
 export function CardPriceChart({ history }: { history: PricePoint[] }) {
-  const [days, setDays] = useState(90);
-
   const data = useMemo(() => {
-    const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
     const byDate = new Map<
       string,
       { date: string; raw: number | null; psa10: number | null; volume: number }
     >();
 
     for (const point of history) {
-      if (point.observed_date < cutoff) continue;
       const entry = byDate.get(point.observed_date) ?? {
         date: point.observed_date,
         raw: null,
@@ -47,7 +44,18 @@ export function CardPriceChart({ history }: { history: PricePoint[] }) {
     }
 
     return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [history, days]);
+  }, [history]);
+
+  // Wide windows get month/year ticks; short ones keep month/day.
+  const spanDays = useMemo(() => {
+    if (data.length < 2) return 0;
+    const first = new Date(data[0].date).getTime();
+    const last = new Date(data[data.length - 1].date).getTime();
+    return Math.round((last - first) / 86_400_000);
+  }, [data]);
+
+  const tickFormatter = (value: string) =>
+    spanDays > 400 ? value.slice(0, 7) : spanDays > 120 ? value.slice(5, 7) + '/' + value.slice(8) : value.slice(5);
 
   if (data.length === 0) {
     return (
@@ -59,24 +67,6 @@ export function CardPriceChart({ history }: { history: PricePoint[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end gap-1">
-        {RANGES.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => setDays(option)}
-            className={cn(
-              'rounded px-2 py-1 text-xs transition-colors',
-              days === option
-                ? 'bg-secondary text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {option}D
-          </button>
-        ))}
-      </div>
-
       <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
@@ -87,7 +77,7 @@ export function CardPriceChart({ history }: { history: PricePoint[] }) {
               tickLine={false}
               axisLine={false}
               minTickGap={32}
-              tickFormatter={(value: string) => value.slice(5)}
+              tickFormatter={tickFormatter}
             />
             <YAxis
               yAxisId="price"
