@@ -73,7 +73,7 @@ export default async function HomePage() {
             <p>No analytics data yet.</p>
             <p>
               Seed metadata with <code className="text-xs">npm run seed:metadata</code>, ingest
-              prices with <code className="text-xs">npm run ingest:prices</code>, then run{' '}
+              prices with <code className="text-xs">npm run ingest:market</code>, then run{' '}
               <code className="text-xs">npm run analytics:refresh</code>.
             </p>
           </CardContent>

@@ -85,10 +85,10 @@ export default async function SealedPage({
           sublabel={`${discounted.length} trading below fair value`}
         />
         <StatCard
-          label="Deepest discount"
+          label={deepest !== null && deepest >= 0 ? 'Smallest premium' : 'Deepest discount'}
           value={formatPercent(deepest)}
           sublabel="Market vs. fair value"
-          tone="positive"
+          tone={deepest !== null && deepest >= 0 ? 'negative' : 'positive'}
         />
         <StatCard
           label="Market value tracked"

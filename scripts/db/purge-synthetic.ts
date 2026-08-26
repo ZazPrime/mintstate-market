@@ -31,14 +31,13 @@ async function main(): Promise<void> {
   await purge('benchmark_history', 'source = $1', [SYNTHETIC]);
   // Scraped population rows record the PSA page they came from.
   await purge('population_reports', "source_url is null or source_url = $1", [SYNTHETIC]);
-  // Rollups keyed to deleted observations would otherwise linger as stale rows.
-  await purge(
-    'card_analytics',
-    'card_id not in (select distinct card_id from public.price_history)',
-    [],
-  );
-
-  for (const fn of ['refresh_card_analytics', 'refresh_window_metrics', 'refresh_sealed_analytics']) {
+  for (const fn of [
+    // Rollups keyed to deleted observations would otherwise linger as stale rows.
+    'prune_orphan_analytics',
+    'refresh_card_analytics',
+    'refresh_window_metrics',
+    'refresh_sealed_analytics',
+  ]) {
     await getPool().query(`select public.${fn}()`);
   }
   log.info('analytics rollups rebuilt from remaining live data');

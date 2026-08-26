@@ -198,9 +198,12 @@ export async function getBenchmarkSeries(symbol = 'SPX'): Promise<BenchmarkPoint
     .from('benchmark_history')
     .select('observed_date, close_value')
     .eq('symbol', symbol)
-    .order('observed_date', { ascending: true });
+    // Newest first: PostgREST caps a response at 1000 rows, and an ascending
+    // read would return the oldest closes and drop the dates the index covers.
+    .order('observed_date', { ascending: false })
+    .limit(1000);
   if (error) throw new Error(`benchmark series: ${error.message}`);
-  return (data ?? []).map((row) => ({
+  return (data ?? []).reverse().map((row) => ({
     observed_date: row.observed_date as string,
     close_value: num(row.close_value) ?? 0,
   }));

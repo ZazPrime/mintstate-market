@@ -9,6 +9,11 @@ import { closePool, getPool } from '../lib/db';
 import { log } from '../lib/log';
 
 async function main() {
+  const pruned = await getPool().query<{ prune_orphan_analytics: number }>(
+    'select public.prune_orphan_analytics() as prune_orphan_analytics',
+  );
+  log.info(`orphan rollup rows pruned: ${pruned.rows[0].prune_orphan_analytics}`);
+
   const analytics = await getPool().query<{ refresh_card_analytics: number }>(
     'select public.refresh_card_analytics() as refresh_card_analytics',
   );

@@ -18,30 +18,44 @@ import { formatDate } from '@/lib/format';
 import type { BenchmarkPoint, IndexPoint } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 
-const RANGES = [
+/** `days: null` means "no cutoff". */
+const RANGES: Array<{ label: string; days: number | null }> = [
   { label: '30D', days: 30 },
   { label: '90D', days: 90 },
   { label: '1Y', days: 365 },
-  { label: 'MAX', days: Number.MAX_SAFE_INTEGER },
+  { label: 'MAX', days: null },
 ];
 
 /** Rebases both series to 100 at the first shared date so they are comparable. */
-function buildSeries(index: IndexPoint[], benchmark: BenchmarkPoint[], days: number) {
-  const cutoff = Number.isFinite(days)
-    ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
-    : '0000-01-01';
+function buildSeries(index: IndexPoint[], benchmark: BenchmarkPoint[], days: number | null) {
+  const cutoff =
+    days === null ? '0000-01-01' : new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 
   const benchmarkByDate = new Map(benchmark.map((point) => [point.observed_date, point.close_value]));
   const filtered = index.filter((point) => point.observed_date >= cutoff);
   if (filtered.length === 0) return [];
 
   const indexBase = filtered[0].index_value;
+  // The benchmark only trades on weekdays, so a card-market date carries the
+  // most recent close at or before it rather than dropping out of the series.
+  const benchmarkDates = benchmark.map((point) => point.observed_date).sort();
+  const closeOn = (date: string): number | undefined => {
+    const exact = benchmarkByDate.get(date);
+    if (exact !== undefined) return exact;
+    let previous: string | undefined;
+    for (const candidate of benchmarkDates) {
+      if (candidate > date) break;
+      previous = candidate;
+    }
+    return previous ? benchmarkByDate.get(previous) : undefined;
+  };
+
   const benchmarkBase = filtered
-    .map((point) => benchmarkByDate.get(point.observed_date))
+    .map((point) => closeOn(point.observed_date))
     .find((value): value is number => value !== undefined);
 
   return filtered.map((point) => {
-    const benchmarkValue = benchmarkByDate.get(point.observed_date);
+    const benchmarkValue = closeOn(point.observed_date);
     return {
       date: point.observed_date,
       msm100: (point.index_value / indexBase) * 100,

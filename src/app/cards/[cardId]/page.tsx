@@ -83,12 +83,14 @@ export default async function CardPage({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{analytics.card_name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                {analytics.set_name} · #{analytics.card_number}
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>
+                  {analytics.set_name} · #{analytics.card_number}
+                </span>
                 {analytics.rarity && <Badge variant="outline">{analytics.rarity}</Badge>}
                 <Badge variant="secondary">{analytics.language.toUpperCase()}</Badge>
                 {analytics.release_date && <span>Released {formatDate(analytics.release_date)}</span>}
-              </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">

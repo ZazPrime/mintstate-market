@@ -131,11 +131,32 @@ async function indexLocalCards(setId: string): Promise<CardIndex> {
 }
 
 /** Provider names sometimes append the collector number ("Pikachu - 025/165"). */
+function providerCardName(providerCard: PptCard): string {
+  return normalizeKey(providerCard.name.replace(/\s+-\s+[\w/]+$/, ''));
+}
+
 function matchCard(providerCard: PptCard, index: CardIndex): LocalCard | null {
-  const cleanName = normalizeKey(providerCard.name.replace(/\s+-\s+[\w/]+$/, ''));
+  const cleanName = providerCardName(providerCard);
   const byNumber = index.byNumber.get(cardNumberKey(providerCard.cardNumber));
   if (byNumber && normalizeKey(byNumber.name) === cleanName) return byNumber;
   return index.byName.get(cleanName) ?? byNumber ?? null;
+}
+
+/**
+ * A single collector number can have several provider printings — the base card
+ * plus pattern variants ("Houndoom (Master Ball Pattern)") that trade at wildly
+ * different prices. Only one may feed a local card, otherwise its series flips
+ * between printings and reads as a 99% crash. The base printing wins: its name
+ * matches the local card exactly, and variants carry a parenthetical suffix.
+ */
+function preferredPrinting(a: PptCard, b: PptCard, local: LocalCard): PptCard {
+  const localName = normalizeKey(local.name);
+  const scoreOf = (card: PptCard): number =>
+    (providerCardName(card) === localName ? 2 : 0) + (/\(/.test(card.name) ? 0 : 1);
+  const scoreA = scoreOf(a);
+  const scoreB = scoreOf(b);
+  if (scoreA !== scoreB) return scoreA > scoreB ? a : b;
+  return (a.prices?.listings ?? 0) >= (b.prices?.listings ?? 0) ? a : b;
 }
 
 /** Collapses rows to one per conflict key, keeping the first: several provider
@@ -187,8 +208,8 @@ async function ingestSingles(
   const priceRows: unknown[][] = [];
   const mapRows: unknown[][] = [];
   const candidates: Array<{ cardId: string; tcgPlayerId: string; market: number }> = [];
+  const chosen = new Map<string, { local: LocalCard; card: PptCard }>();
   const today = new Date().toISOString().slice(0, 10);
-  let cards = 0;
   let unmatched = 0;
   let offset = 0;
 
@@ -200,23 +221,31 @@ async function ingestSingles(
         unmatched += 1;
         continue;
       }
-      mapRows.push([SOURCE, providerCard.tcgPlayerId, local.id, providerCard.name]);
-      cards += 1;
-
-      const market = providerCard.prices?.market;
-      if (typeof market !== 'number' || market <= 0) continue;
-      priceRows.push([
-        local.id, 'RAW', today, SOURCE, 'USD', 0,
-        providerCard.prices?.low ?? null, market, null, market,
-        providerCard.prices?.listings ?? providerCard.prices?.sellers ?? null,
-      ]);
-      candidates.push({ cardId: local.id, tcgPlayerId: providerCard.tcgPlayerId, market });
+      const current = chosen.get(local.id);
+      chosen.set(local.id, {
+        local,
+        card: current ? preferredPrinting(current.card, providerCard, local) : providerCard,
+      });
     }
 
     offset += page.items.length;
     if (!page.hasMore || page.items.length === 0) break;
     if (client.remaining <= PAGE_SIZE) break;
   }
+
+  for (const { local, card: providerCard } of Array.from(chosen.values())) {
+    mapRows.push([SOURCE, providerCard.tcgPlayerId, local.id, providerCard.name]);
+
+    const market = providerCard.prices?.market;
+    if (typeof market !== 'number' || market <= 0) continue;
+    priceRows.push([
+      local.id, 'RAW', today, SOURCE, 'USD', 0,
+      providerCard.prices?.low ?? null, market, null, market,
+      providerCard.prices?.listings ?? providerCard.prices?.sellers ?? null,
+    ]);
+    candidates.push({ cardId: local.id, tcgPlayerId: providerCard.tcgPlayerId, market });
+  }
+  const cards = chosen.size;
 
   const enrichTargets = candidates
     .sort((a, b) => b.market - a.market)
@@ -380,6 +409,7 @@ async function ingestSealed(
 
 async function refreshAnalytics(): Promise<void> {
   for (const fn of [
+    'prune_orphan_analytics',
     'refresh_card_analytics',
     'refresh_window_metrics',
     'refresh_sealed_analytics',

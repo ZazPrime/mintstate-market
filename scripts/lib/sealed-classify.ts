@@ -26,31 +26,39 @@ export function classifySealedProduct(
 
   const etbPacks = (releaseDate ?? '') >= '2023-01-01' ? 9 : 8;
   const cardsPerPack = (releaseDate ?? '') >= '2020-01-01' ? 10 : 11;
-  const isCase = lower.includes('case');
+  const isCase = lower.includes('case') && !lower.includes('checklane');
+  // "[Set of 2]" and "[Set of 6]" listings are several units sold together.
+  const bundleSize = Number(/\[set of (\d+)\]/.exec(lower)?.[1] ?? 1);
+  const scale = (units: number): number => units * bundleSize;
 
   if (lower.includes('elite trainer box')) {
     return isCase
-      ? { type: 'collection_case', packs: etbPacks * 10, cardsPerPack }
-      : { type: 'elite_trainer_box', packs: etbPacks, cardsPerPack };
+      ? { type: 'collection_case', packs: scale(etbPacks * 10), cardsPerPack }
+      : { type: 'elite_trainer_box', packs: scale(etbPacks), cardsPerPack };
   }
   if (lower.includes('booster bundle')) {
     return isCase
-      ? { type: 'collection_case', packs: 6 * 10, cardsPerPack }
-      : { type: 'booster_bundle', packs: 6, cardsPerPack };
+      ? { type: 'collection_case', packs: scale(6 * 10), cardsPerPack }
+      : { type: 'booster_bundle', packs: scale(6), cardsPerPack };
   }
   if (lower.includes('booster box') || lower.includes('booster case')) {
     const boxPacks = lower.includes('half booster box') ? 18 : 36;
     return isCase
-      ? { type: 'collection_case', packs: boxPacks * 6, cardsPerPack }
-      : { type: 'booster_box', packs: boxPacks, cardsPerPack };
+      ? { type: 'collection_case', packs: scale(boxPacks * 6), cardsPerPack }
+      : { type: 'booster_box', packs: scale(boxPacks), cardsPerPack };
   }
   if (lower.includes('build and battle box') || lower.includes('build & battle')) {
     return isCase
-      ? { type: 'collection_case', packs: 4 * 10, cardsPerPack }
-      : { type: 'blister', packs: 4, cardsPerPack };
+      ? { type: 'collection_case', packs: scale(4 * 10), cardsPerPack }
+      : { type: 'blister', packs: scale(4), cardsPerPack };
   }
   if (lower.includes('blister') || lower.includes('checklane')) {
-    return { type: 'blister', packs: 3, cardsPerPack };
+    // Blisters state their own pack count ("3 Pack Blister", "2-Pack Blister"),
+    // and a blister case holds a dozen of them.
+    const blisterPacks = Number(/(\d+)[\s-]*pack/.exec(lower)?.[1] ?? 3);
+    return isCase
+      ? { type: 'collection_case', packs: scale(blisterPacks * 12), cardsPerPack }
+      : { type: 'blister', packs: scale(blisterPacks), cardsPerPack };
   }
   return null;
 }
