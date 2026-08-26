@@ -74,7 +74,7 @@ function toDailyRows(cardId: string, grade: Grade, source: string, sales: EbaySa
     byDay.set(sale.soldDate, bucket);
   }
 
-  return [...byDay.entries()].flatMap(([day, rawPrices]) => {
+  return Array.from(byDay.entries()).flatMap(([day, rawPrices]) => {
     const prices = rejectOutliers(rawPrices);
     if (prices.length === 0) return [];
     return [[
