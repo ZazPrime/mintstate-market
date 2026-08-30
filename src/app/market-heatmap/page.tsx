@@ -59,10 +59,8 @@ export default async function MarketHeatmapPage({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Monthly performance</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Month-over-month change in each set&apos;s chase-card index, measured on{' '}
-          {SERIES_BLURB[series]}. Each link only compares cards priced in both months, so a card
-          entering or leaving coverage never shows up as a move. Descriptive of the past, not a
-          forecast.
+          Every tracked set&apos;s chase-card index and sealed price, month over month, showing
+          which sets ran and which cooled. Descriptive of the past, not a forecast.
         </p>
       </div>
 
@@ -105,6 +103,12 @@ export default async function MarketHeatmapPage({
           <CardTitle className="text-sm font-medium">
             Monthly performance · each set&apos;s index
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Month-over-month change in each set&apos;s index on {SERIES_BLURB[series]}, by set and
+            month. Colour repeats the number in each cell and carries nothing on its own. A month
+            is only compared against members priced in both months, so a card entering or leaving
+            coverage never reads as a move.
+          </p>
         </CardHeader>
         <CardContent>
           {cells.length === 0 ? (

@@ -181,16 +181,21 @@ export class PokemonPriceTrackerClient {
 
   /**
    * Current market snapshot for a page of a set's singles. Costs 1 call per
-   * card, which is what makes broad set coverage affordable.
+   * card, which is what makes broad set coverage affordable. Sorting by price
+   * puts the chase cards on the first page, so a caller that only wants the top
+   * N can stop after one page instead of paying for the whole set.
    */
   async listSetCards(
     setId: string,
     offset: number,
     limit = MAX_PAGE_SIZE,
+    byPrice = false,
   ): Promise<PptPage<PptCard>> {
     const response = await this.request<PptCard>(
       '/cards',
-      { setId, limit, offset, lightweight: true },
+      byPrice
+        ? { setId, limit, offset, lightweight: true, sortBy: 'price', sortOrder: 'desc' }
+        : { setId, limit, offset, lightweight: true },
       limit,
     );
     return {
