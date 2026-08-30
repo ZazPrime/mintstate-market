@@ -440,6 +440,7 @@ async function refreshAnalytics(): Promise<void> {
     'refresh_card_analytics',
     'refresh_window_metrics',
     'refresh_sealed_analytics',
+    'refresh_set_monthly_performance',
   ]) {
     await getPool().query(`select public.${fn}()`);
   }

@@ -8,11 +8,14 @@ import type {
   DemandCell,
   GradeDistributionRow,
   IndexPoint,
+  MonthlyBasket,
+  MonthlySeriesKey,
   MoverRow,
   PackEvRow,
   PopulationPoint,
   PricePoint,
   SealedGapRow,
+  SetMonthlyCell,
   SparklinePoint,
   TrackedGrade,
   ValuationDrivers,
@@ -472,4 +475,34 @@ export async function getMarketSummary(): Promise<MarketSummary> {
     indexChange30d: latest && monthAgo ? latest / monthAgo - 1 : null,
     asOf: board[0]?.as_of_date ?? null,
   };
+}
+
+const MONTHLY_NUMERIC = ['index_value', 'change_pct', 'basket_size', 'avg_price'];
+
+export interface MonthlyPerformanceQuery {
+  series?: MonthlySeriesKey;
+  basket?: MonthlyBasket;
+  era?: string;
+}
+
+/** Set × month grid of chain-linked chase-index changes. */
+export async function getMonthlyPerformance(
+  query: MonthlyPerformanceQuery = {},
+): Promise<SetMonthlyCell[]> {
+  const { series = 'RAW', basket = 0, era } = query;
+
+  const supabase = createPublicSupabase();
+  let request = supabase
+    .from('set_monthly_matrix')
+    .select('*')
+    .eq('series_key', series)
+    .eq('basket', basket)
+    .order('release_date', { ascending: false })
+    .order('month', { ascending: true });
+
+  if (era && era !== 'all') request = request.eq('era', era);
+
+  const { data, error } = await request;
+  if (error) throw new Error(`monthly performance: ${error.message}`);
+  return (data ?? []).map((row) => withNumbers<SetMonthlyCell>(row, MONTHLY_NUMERIC));
 }
