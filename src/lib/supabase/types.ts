@@ -79,6 +79,7 @@ export interface MoverRow {
   start_price: number | null;
   end_price: number | null;
   change_pct: number | null;
+  change_abs: number | null;
   low_price: number | null;
   high_price: number | null;
   median_price: number | null;

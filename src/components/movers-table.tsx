@@ -40,6 +40,12 @@ export function MoversTable({
           <TableHead className="text-right" title={`Price change over ${windowLabel}`}>
             Change
           </TableHead>
+          <TableHead
+            className="text-right"
+            title={`Dollars gained or lost per card over ${windowLabel}`}
+          >
+            $ Move
+          </TableHead>
           <TableHead className="text-right" title={`Sold listings over ${windowLabel}`}>
             Sales
           </TableHead>
@@ -71,6 +77,16 @@ export function MoversTable({
               )}
             >
               {formatPercent(row.change_pct)}
+            </TableCell>
+            <TableCell
+              className={cn(
+                'text-right tabular',
+                (row.change_abs ?? 0) >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80',
+              )}
+            >
+              {row.change_abs === null
+                ? '—'
+                : `${row.change_abs >= 0 ? '+' : '\u2212'}${formatCurrency(Math.abs(row.change_abs))}`}
             </TableCell>
             <TableCell className="text-right tabular text-muted-foreground">
               {formatCompact(row.sales_total)}

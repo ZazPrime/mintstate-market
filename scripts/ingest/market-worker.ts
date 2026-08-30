@@ -6,6 +6,7 @@
  *   npm run ingest:market -- --sets=sv08,sv3pt5    # specific provider sets
  *   npm run ingest:market -- --budget=5000 --days=180 --refresh
  *   npm run ingest:market -- --chase --enrich=20    # top 20 cards of every set
+ *   npm run ingest:market -- --chase --spread       # rotate eras, WOTC included
  *
  * Singles land in price_history as RAW (TCGplayer Near Mint market series, with
  * the provider's daily sales volume) plus PSA10/PSA9 rows built from eBay sold
@@ -56,6 +57,31 @@ interface QueuedSet {
   external_name: string | null;
   set_id: string;
   release_date: string | null;
+  era: string;
+}
+
+/**
+ * Newest-first is depth-first on the modern era: a budget-limited run never
+ * reaches WOTC, so the app looks like it only knows Scarlet & Violet. Taking
+ * one set from each era in turn spreads the same budget across all of history.
+ */
+function spreadByEra(sets: QueuedSet[]): QueuedSet[] {
+  const byEra = new Map<string, QueuedSet[]>();
+  for (const set of sets) {
+    const bucket = byEra.get(set.era);
+    if (bucket) bucket.push(set);
+    else byEra.set(set.era, [set]);
+  }
+
+  const buckets = Array.from(byEra.values());
+  const spread: QueuedSet[] = [];
+  for (let round = 0; spread.length < sets.length; round += 1) {
+    for (const bucket of buckets) {
+      const set = bucket[round];
+      if (set) spread.push(set);
+    }
+  }
+  return spread;
 }
 
 interface CardIndex {
@@ -480,7 +506,8 @@ async function main(): Promise<void> {
 
   // Newest sets first: they carry the most price movement per call spent.
   const { rows: mappedSets } = await getPool().query<QueuedSet>(
-    `select m.external_id, m.external_name, m.set_id, s.release_date::text as release_date
+    `select m.external_id, m.external_name, m.set_id, s.release_date::text as release_date,
+            public.set_era(s.release_date) as era
        from public.external_set_map m
        join public.sets s on s.id = m.set_id
       where m.source = $1
@@ -497,7 +524,9 @@ async function main(): Promise<void> {
           wanted.includes(setKey(row.set_id)) ||
           setKeyCandidates(row.external_name ?? '').some((key) => wanted.includes(key)),
       )
-    : mappedSets;
+    : flag('spread')
+      ? spreadByEra(mappedSets)
+      : mappedSets;
   if (queue.length === 0) {
     log.warn('no mapped sets to ingest');
     return;
