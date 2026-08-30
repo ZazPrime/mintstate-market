@@ -19,6 +19,7 @@ import {
   getCardIntelligence,
   getCardPopulation,
   getCardPriceHistory,
+  getCardProfile,
   getGradeDistribution,
   getValuationDrivers,
 } from '@/lib/data/market';
@@ -38,8 +39,8 @@ const WINDOW_DAYS: Record<WindowKey, number> = {
 };
 
 export async function generateMetadata({ params }: { params: { cardId: string } }) {
-  const analytics = await getCardAnalytics(params.cardId);
-  return { title: analytics ? `${analytics.card_name} — Card Intelligence` : 'Card Intelligence' };
+  const card = (await getCardAnalytics(params.cardId)) ?? (await getCardProfile(params.cardId));
+  return { title: card ? `${card.card_name} — Card Intelligence` : 'Card Intelligence' };
 }
 
 export default async function CardPage({
@@ -51,19 +52,22 @@ export default async function CardPage({
 }) {
   const window = (WINDOWS.find((w) => w === searchParams.window) ?? '90d') as WindowKey;
 
-  const [analytics, history, recent, population, drivers, intel, distribution] = await Promise.all([
-    getCardAnalytics(params.cardId),
-    getCardPriceHistory(params.cardId, WINDOW_DAYS[window]),
-    getCardPriceHistory(params.cardId, 30),
-    getCardPopulation(params.cardId),
-    getValuationDrivers(params.cardId),
-    getCardIntelligence(params.cardId),
-    getGradeDistribution(params.cardId),
-  ]);
+  const [analytics, profile, history, recent, population, drivers, intel, distribution] =
+    await Promise.all([
+      getCardAnalytics(params.cardId),
+      getCardProfile(params.cardId),
+      getCardPriceHistory(params.cardId, WINDOW_DAYS[window]),
+      getCardPriceHistory(params.cardId, 30),
+      getCardPopulation(params.cardId),
+      getValuationDrivers(params.cardId),
+      getCardIntelligence(params.cardId),
+      getGradeDistribution(params.cardId),
+    ]);
 
-  if (!analytics) notFound();
+  const head = analytics ?? profile;
+  if (!head) notFound();
 
-  const image = analytics.images?.large ?? analytics.images?.small;
+  const image = head.images?.large ?? head.images?.small;
   const latestPop = population.at(-1);
   const edge = intel
     ? gradingEdge({
@@ -81,7 +85,7 @@ export default async function CardPage({
           <div className="relative h-[340px] w-[244px] shrink-0 overflow-hidden rounded-xl border border-border bg-card">
             <Image
               src={image}
-              alt={analytics.card_name}
+              alt={head.card_name}
               fill
               sizes="244px"
               className="object-contain p-2"
@@ -93,16 +97,17 @@ export default async function CardPage({
         <div className="flex-1 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{analytics.card_name}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">{head.card_name}</h1>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>
-                  {analytics.set_name} · #{analytics.card_number}
+                  {head.set_name} · #{head.card_number}
                 </span>
-                {analytics.rarity && <Badge variant="outline">{analytics.rarity}</Badge>}
-                <Badge variant="secondary">{analytics.language.toUpperCase()}</Badge>
-                {analytics.release_date && <span>Released {formatDate(analytics.release_date)}</span>}
+                {head.rarity && <Badge variant="outline">{head.rarity}</Badge>}
+                <Badge variant="secondary">{head.language.toUpperCase()}</Badge>
+                {head.release_date && <span>Released {formatDate(head.release_date)}</span>}
               </div>
             </div>
+            {analytics && (
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -112,8 +117,17 @@ export default async function CardPage({
               </div>
               <GradeBadge grade={analytics.investment_grade} size="lg" />
             </div>
+            )}
           </div>
 
+          {!analytics && (
+            <div className="rounded-lg border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
+              No market data for this card yet — the pricing sweep covers sets in rotation and has
+              not reached this one. Valuation, grading and volume panels appear once real comps land.
+            </div>
+          )}
+
+          {analytics && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Raw market"
@@ -138,6 +152,7 @@ export default async function CardPage({
               sublabel="Expected net of fees at observed gem rate"
             />
           </div>
+          )}
 
         </div>
       </div>
@@ -159,6 +174,7 @@ export default async function CardPage({
 
       {drivers && <ValuationBreakdown drivers={drivers} />}
 
+      {analytics && (
       <div className="grid gap-5 xl:grid-cols-[3fr,2fr]">
         <Card className="border-border/70">
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-2">
@@ -207,13 +223,16 @@ export default async function CardPage({
           </CardContent>
         </Card>
       </div>
+      )}
 
+      {analytics && (
       <p className="text-xs text-muted-foreground">
         Analytics as of {analytics.as_of_date ? formatDate(analytics.as_of_date) : '—'} · 30-day
         momentum {formatPercent(analytics.momentum_30d)} · 90-day volatility{' '}
         {formatPercent(analytics.volatility_90d)} · {formatCompact(analytics.sales_30d)} sales in the
         last 30 days.
       </p>
+      )}
     </div>
   );
 }

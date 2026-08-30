@@ -151,6 +151,46 @@ export async function getCardPopulation(cardId: string): Promise<PopulationPoint
   }));
 }
 
+export interface CardProfileRow {
+  card_id: string;
+  card_name: string;
+  card_number: string;
+  rarity: string | null;
+  language: string;
+  images: { small?: string; large?: string } | null;
+  set_name: string;
+  release_date: string | null;
+}
+
+/**
+ * Catalogue metadata for a card, independent of whether the pricing sweep has
+ * reached it yet. The analytics views only hold priced cards, so the detail
+ * page needs this to stay useful for the rest of the catalogue.
+ */
+export async function getCardProfile(cardId: string): Promise<CardProfileRow | null> {
+  const supabase = createPublicSupabase();
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, name, number, rarity, language, images, sets(name, release_date)')
+    .eq('id', cardId)
+    .maybeSingle();
+  if (error) throw new Error(`card profile: ${error.message}`);
+  if (!data) return null;
+
+  const set = data.sets as { name?: string; release_date?: string } | { name?: string; release_date?: string }[] | null;
+  const setRow = Array.isArray(set) ? set[0] : set;
+  return {
+    card_id: data.id as string,
+    card_name: data.name as string,
+    card_number: data.number as string,
+    rarity: (data.rarity as string | null) ?? null,
+    language: (data.language as string | null) ?? 'en',
+    images: (data.images as CardProfileRow['images']) ?? null,
+    set_name: setRow?.name ?? '',
+    release_date: setRow?.release_date ?? null,
+  };
+}
+
 export interface CardSearchResult {
   id: string;
   name: string;
