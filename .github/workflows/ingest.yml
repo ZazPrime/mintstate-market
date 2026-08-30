@@ -1,0 +1,42 @@
+name: Daily market ingestion
+
+# The sweep is rate-limited to 60 provider calls/minute, so a single run only
+# advances part of the catalogue; the cursor lives in Supabase (ingest_cursor)
+# and each run resumes where the last one stopped.
+on:
+  schedule:
+    - cron: '15 7 * * *'
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: 'Provider API calls to spend this run'
+        default: '12000'
+      enrich:
+        description: 'Chase cards priced per set'
+        default: '15'
+
+concurrency:
+  group: market-ingestion
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      POKEMON_PRICE_TRACKER_API_KEY: ${{ secrets.POKEMON_PRICE_TRACKER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Chase sweep across every era
+        run: >-
+          npm run ingest:market --
+          --chase --spread --refresh
+          --enrich=${{ inputs.enrich || '15' }}
+          --days=180
+          --budget=${{ inputs.budget || '12000' }}
