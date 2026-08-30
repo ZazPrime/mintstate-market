@@ -2,7 +2,7 @@ import { MarketIndexChart } from '@/components/market-index-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getBenchmarkSeries, getIndexSeries } from '@/lib/data/market';
 
-export const revalidate = 900;
+export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Market Index' };
 

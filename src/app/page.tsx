@@ -16,7 +16,7 @@ import { formatCurrency, formatDate, formatPercent } from '@/lib/format';
 import type { CardAnalyticsRow } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 
-export const revalidate = 900;
+export const dynamic = 'force-dynamic';
 
 function MoverRow({ row, metric }: { row: CardAnalyticsRow; metric: 'premium' | 'arbitrage' }) {
   const value = metric === 'premium' ? row.raw_premium_pct : row.grading_arbitrage_net;

@@ -84,9 +84,10 @@ Pack counts are not part of the sealed feed and are derived from the product nam
 | `DATABASE_URL` | Postgres connection used by migrations and workers |
 | `POKEMON_PRICE_TRACKER_API_KEY` | PokemonPriceTracker v2 key used by the ingestion service |
 
-Only the two `NEXT_PUBLIC_SUPABASE_*` values are needed to build and serve the site; `DATABASE_URL`
+Only the two `NEXT_PUBLIC_SUPABASE_*` values are needed to serve the site; `DATABASE_URL`
 and `POKEMON_PRICE_TRACKER_API_KEY` are used exclusively by the migration and ingestion scripts,
-which never run in the request path.
+which never run in the request path. Every data-backed page is server-rendered on demand, so
+`next build` succeeds without any environment variables configured.
 
 ### Scheduling
 
