@@ -228,11 +228,13 @@ function normalizeSparkline(value: unknown): SparklinePoint[] {
 }
 
 const MOVER_NUMERIC = [
-  'start_price', 'end_price', 'change_pct', 'low_price', 'high_price', 'median_price',
+  'start_price', 'end_price', 'change_pct', 'change_abs',
+  'low_price', 'high_price', 'median_price',
   'sales_total', 'velocity', 'coverage', 'volatility', 'observation_days',
 ];
 
 export type MoverDirection = 'risers' | 'fallers';
+export type MoverRank = 'pct' | 'abs';
 
 export interface MoversQuery {
   window?: WindowKey;
@@ -241,6 +243,10 @@ export interface MoversQuery {
   direction?: MoverDirection;
   /** Ignore illiquid cards whose "move" is one stale sale. */
   minSales?: number;
+  /** Price floor on the latest clearing price, in USD. Keeps bulk out. */
+  minPrice?: number;
+  /** Rank on percent move or on dollars gained/lost per card. */
+  rank?: MoverRank;
   limit?: number;
 }
 
@@ -251,8 +257,12 @@ export async function getMovers(query: MoversQuery = {}): Promise<MoverRow[]> {
     era,
     direction = 'risers',
     minSales = 5,
+    minPrice = 0,
+    rank = 'pct',
     limit = 25,
   } = query;
+
+  const rankColumn = rank === 'abs' ? 'change_abs' : 'change_pct';
 
   const supabase = createPublicSupabase();
   let request = supabase
@@ -264,8 +274,9 @@ export async function getMovers(query: MoversQuery = {}): Promise<MoverRow[]> {
     .not('change_pct', 'is', null)
     .limit(limit);
 
+  if (minPrice > 0) request = request.gte('end_price', minPrice);
   if (era && era !== 'all') request = request.eq('era', era);
-  request = request.order('change_pct', { ascending: direction === 'fallers' });
+  request = request.order(rankColumn, { ascending: direction === 'fallers' });
 
   const { data, error } = await request;
   if (error) throw new Error(`movers (${direction}): ${error.message}`);
