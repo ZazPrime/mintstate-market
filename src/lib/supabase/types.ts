@@ -240,3 +240,22 @@ export interface PackEvRow {
   roi_pct: number | null;
   top3_chase_share: number | null;
 }
+
+export type MonthlySeriesKey = 'RAW' | 'PSA10' | 'SEALED';
+/** Chase-basket size; 0 tracks every priced member of the set. */
+export type MonthlyBasket = 0 | 5 | 10 | 20;
+
+export interface SetMonthlyCell {
+  set_id: string;
+  series_key: MonthlySeriesKey;
+  basket: MonthlyBasket;
+  month: string;
+  index_value: number | null;
+  change_pct: number | null;
+  basket_size: number;
+  avg_price: number | null;
+  set_name: string;
+  series: string | null;
+  release_date: string | null;
+  era: string;
+}

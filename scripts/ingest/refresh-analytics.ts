@@ -29,6 +29,9 @@ async function main() {
   );
   log.info(`sealed_analytics rows written: ${sealed.rows[0].refresh_sealed_analytics}`);
 
+  await getPool().query('select public.refresh_set_monthly_performance()');
+  log.info('set_monthly_performance refreshed');
+
   // Keep the index basket at the 100 most liquid cards with PSA 10 pricing.
   await getPool().query(`
     with ranked as (

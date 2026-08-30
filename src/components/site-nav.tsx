@@ -8,6 +8,7 @@ import {
   Boxes,
   Calculator,
   Flame,
+  Gauge,
   Grid3x3,
   LineChart,
   Package,
@@ -20,7 +21,8 @@ import { cn } from '@/lib/utils';
 const LINKS = [
   { href: '/', label: 'Overview', icon: Activity },
   { href: '/movers', label: 'Movers', icon: Flame },
-  { href: '/heatmap', label: 'Demand', icon: Grid3x3 },
+  { href: '/market-heatmap', label: 'Heatmap', icon: Grid3x3 },
+  { href: '/heatmap', label: 'Demand', icon: Gauge },
   { href: '/sealed', label: 'Sealed', icon: Package },
   { href: '/sealed-ev', label: 'Pack EV', icon: Boxes },
   { href: '/fair-value', label: 'Fair Value', icon: Sparkles },
