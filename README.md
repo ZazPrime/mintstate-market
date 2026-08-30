@@ -80,9 +80,13 @@ Pack counts are not part of the sealed feed and are derived from the product nam
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public/publishable key used by the frontend |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public/publishable key used by the frontend (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is accepted too) |
 | `DATABASE_URL` | Postgres connection used by migrations and workers |
 | `POKEMON_PRICE_TRACKER_API_KEY` | PokemonPriceTracker v2 key used by the ingestion service |
+
+Only the two `NEXT_PUBLIC_SUPABASE_*` values are needed to build and serve the site; `DATABASE_URL`
+and `POKEMON_PRICE_TRACKER_API_KEY` are used exclusively by the migration and ingestion scripts,
+which never run in the request path.
 
 ### Scheduling
 
@@ -101,8 +105,11 @@ The workers are plain Node entrypoints, so any scheduler works (cron, GitHub Act
   value with a 30-day trailing sparkline per row.
 - **Grading Arbitrage** (`/arbitrage`) — raw price + service-tier fees + shipping vs. gem-rate
   weighted PSA 10 proceeds, with adjustable assumptions.
-- **Card Intelligence** (`/cards/[cardId]`) — demand durability grade, price/volume history,
-  PSA population trend, component scores.
+- **Card Intelligence** (`/cards/[cardId]`) — 6-month price band, last-3 comp average, 0–100
+  investment score with demand/scarcity/stability drivers, supply & demand radar with a 30-day
+  volume histogram, PSA grade distribution and grading edge, price/volume history.
+- **Pack & Sealed EV** (`/sealed-ev`) — set-level pack price vs. expected singles value, per-pack
+  gap, ROI and top-3 chase concentration.
 - **Market Index** (`/market-index`) — chain-linked MintState 100 rebased against the S&P 500.
 
 ## Scripts
