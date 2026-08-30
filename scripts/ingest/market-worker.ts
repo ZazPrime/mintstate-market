@@ -5,6 +5,7 @@
  *   npm run ingest:market                          # resume the catalogue sweep
  *   npm run ingest:market -- --sets=sv08,sv3pt5    # specific provider sets
  *   npm run ingest:market -- --budget=5000 --days=180 --refresh
+ *   npm run ingest:market -- --chase --enrich=20    # top 20 cards of every set
  *
  * Singles land in price_history as RAW (TCGplayer Near Mint market series, with
  * the provider's daily sales volume) plus PSA10/PSA9 rows built from eBay sold
@@ -28,7 +29,8 @@ import {
 import { classifySealedProduct, sealedProductId } from '../lib/sealed-classify';
 
 const SOURCE = 'pokemonpricetracker';
-const CURSOR_KEY = 'set_sweep';
+const FULL_CURSOR_KEY = 'set_sweep';
+const CHASE_CURSOR_KEY = 'chase_sweep';
 const PAGE_SIZE = 50;
 const GRADES: Array<{ column: 'PSA10' | 'PSA9' | 'BGS95' | 'CGC10'; providerKey: string }> = [
   { column: 'PSA10', providerKey: 'psa10' },
@@ -189,15 +191,19 @@ async function dropSnapshotsForSeriesCards(snapshots: Map<string, unknown[]>): P
   for (const row of rows) snapshots.delete(row.card_id);
 }
 
-async function readCursor(): Promise<string | null> {
+async function readCursor(cursorKey: string): Promise<string | null> {
   const { rows } = await getPool().query<{ cursor_value: string | null }>(
     'select cursor_value from public.ingest_cursor where source = $1 and cursor_key = $2',
-    [SOURCE, CURSOR_KEY],
+    [SOURCE, cursorKey],
   );
   return rows[0]?.cursor_value ?? null;
 }
 
-async function writeCursor(value: string | null, callsUsed: number): Promise<void> {
+async function writeCursor(
+  cursorKey: string,
+  value: string | null,
+  callsUsed: number,
+): Promise<void> {
   await getPool().query(
     `insert into public.ingest_cursor (source, cursor_key, cursor_value, requests_used, last_run_at)
      values ($1, $2, $3, $4, now())
@@ -205,7 +211,7 @@ async function writeCursor(value: string | null, callsUsed: number): Promise<voi
        set cursor_value = excluded.cursor_value,
            requests_used = excluded.requests_used,
            last_run_at = excluded.last_run_at`,
-    [SOURCE, CURSOR_KEY, value, callsUsed],
+    [SOURCE, cursorKey, value, callsUsed],
   );
 }
 
@@ -219,6 +225,7 @@ async function ingestSingles(
   set: QueuedSet,
   days: number,
   enrichLimit: number,
+  chaseOnly: boolean,
 ): Promise<{ cards: number; enriched: number; rows: number; unmatched: number }> {
   const index = await indexLocalCards(set.set_id);
   if (index.byNumber.size === 0) return { cards: 0, enriched: 0, rows: 0, unmatched: 0 };
@@ -233,7 +240,12 @@ async function ingestSingles(
   let offset = 0;
 
   for (;;) {
-    const page = await client.listSetCards(set.external_id, offset, PAGE_SIZE);
+    const page = await client.listSetCards(
+      set.external_id,
+      offset,
+      chaseOnly ? Math.min(PAGE_SIZE, enrichLimit) : PAGE_SIZE,
+      chaseOnly,
+    );
     for (const providerCard of page.items) {
       const local = matchCard(providerCard, index);
       if (!local) {
@@ -250,6 +262,8 @@ async function ingestSingles(
     offset += page.items.length;
     if (!page.hasMore || page.items.length === 0) break;
     if (client.remaining <= PAGE_SIZE) break;
+    // Sorted by price, so the chase cards are already in hand.
+    if (chaseOnly && chosen.size >= enrichLimit) break;
   }
 
   for (const { local, card: providerCard } of Array.from(chosen.values())) {
@@ -453,6 +467,10 @@ async function main(): Promise<void> {
   const budget = Number(arg('budget') ?? 15_000);
   const days = Number(arg('days') ?? 90);
   const enrichLimit = Number(arg('enrich') ?? 40);
+  /** Skip the full per-set snapshot and spend the budget on the chase cards
+   *  that drive each set's index — the difference between covering ~10 sets and
+   *  the whole catalogue in one day. */
+  const chaseOnly = flag('chase');
   const onlySets = arg('sets')?.split(',').map((value) => value.trim()).filter(Boolean) ?? null;
   const doSingles = !flag('sealed-only');
   const doSealed = !flag('singles-only');
@@ -485,7 +503,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const cursor = onlySets ? null : await readCursor();
+  const cursorKey = chaseOnly ? CHASE_CURSOR_KEY : FULL_CURSOR_KEY;
+  const cursor = onlySets ? null : await readCursor(cursorKey);
   const resumeIndex = cursor
     ? Math.max(0, queue.findIndex((row) => row.external_id === cursor))
     : 0;
@@ -504,7 +523,7 @@ async function main(): Promise<void> {
     }
 
     if (doSingles) {
-      const result = await ingestSingles(client, set, days, enrichLimit);
+      const result = await ingestSingles(client, set, days, enrichLimit, chaseOnly);
       totals.cards += result.cards;
       totals.enriched += result.enriched;
       totals.priceRows += result.rows;
@@ -523,7 +542,7 @@ async function main(): Promise<void> {
     nextCursor = queue[index + 1]?.external_id ?? null;
   }
 
-  if (!onlySets) await writeCursor(nextCursor, client.used);
+  if (!onlySets) await writeCursor(cursorKey, nextCursor, client.used);
   if (flag('refresh')) await refreshAnalytics();
 
   log.info(
