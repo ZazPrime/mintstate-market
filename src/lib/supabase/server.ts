@@ -3,22 +3,32 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing environment variable ${name}`);
-  return value;
+/**
+ * The Vercel↔Supabase integration publishes the project credentials under
+ * unprefixed names, and a `NEXT_PUBLIC_` variable marked Sensitive is withheld
+ * from the build that inlines it. Either source is enough to serve the site, so
+ * every accepted spelling is tried before giving up.
+ */
+function firstEnv(names: string[]): string {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  throw new Error(`Missing environment variable ${names[0]}`);
 }
 
 export function supabaseUrl(): string {
-  return requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+  return firstEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL']);
 }
 
 export function supabaseAnonKey(): string {
   // Supabase renamed anon keys to "publishable"; accept either name.
-  return (
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    requiredEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
-  );
+  return firstEnv([
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+  ]);
 }
 
 /** Request-scoped client that carries the user's session (respects RLS). */
