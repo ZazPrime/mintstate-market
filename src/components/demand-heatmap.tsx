@@ -148,7 +148,7 @@ export function DemandGrid({ cells, window }: { cells: DemandCell[]; window: Win
                     <span className="block truncate text-[10px] opacity-75">{cell.set_name}</span>
                     <span className="mt-1 flex items-baseline justify-between text-[11px] tabular">
                       <span className="font-semibold">{formatPercent(change, 0)}</span>
-                      <span className="opacity-80">{formatCurrency(cell.end_price, 0)}</span>
+                      <span className="opacity-80">{formatCurrency(cell.end_price, cell.end_price !== null && cell.end_price < 10 ? 2 : 0)}</span>
                     </span>
                     <span className="flex items-baseline justify-between text-[10px] opacity-75">
                       <span>{cell.trajectory}</span>

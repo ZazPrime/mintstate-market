@@ -25,7 +25,7 @@ import {
 import { formatCompact, formatCurrency, formatDate, formatPercent } from '@/lib/format';
 import type { WindowKey } from '@/lib/supabase/types';
 
-export const revalidate = 900;
+export const dynamic = 'force-dynamic';
 
 const WINDOWS: WindowKey[] = ['30d', '90d', '365d', 'all'];
 
@@ -106,7 +106,7 @@ export default async function CardPage({
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Demand durability
+                  Demand durability grade
                 </p>
                 <p className="text-xs text-muted-foreground">S+ to F</p>
               </div>
