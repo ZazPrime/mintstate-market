@@ -171,6 +171,24 @@ function dedupe(rows: unknown[][], keyIndexes: number[]): unknown[][] {
   return Array.from(byKey.values());
 }
 
+/**
+ * Snapshot rows and Near Mint series rows measure the same card differently and
+ * routinely disagree by an order of magnitude. A card enriched by an earlier
+ * sweep already owns a series, so laying a fresh snapshot on top of it reads as
+ * a one-day crash on the chart; it keeps the series and waits for the next
+ * enrichment pass instead. Series rows are the ones without listing depth.
+ */
+async function dropSnapshotsForSeriesCards(snapshots: Map<string, unknown[]>): Promise<void> {
+  if (snapshots.size === 0) return;
+  const { rows } = await getPool().query<{ card_id: string }>(
+    `select distinct card_id from public.price_history
+      where grade = 'RAW' and source = $1 and listing_count is null
+        and card_id = any($2::text[])`,
+    [SOURCE, Array.from(snapshots.keys())],
+  );
+  for (const row of rows) snapshots.delete(row.card_id);
+}
+
 async function readCursor(): Promise<string | null> {
   const { rows } = await getPool().query<{ cursor_value: string | null }>(
     'select cursor_value from public.ingest_cursor where source = $1 and cursor_key = $2',
@@ -280,6 +298,8 @@ async function ingestSingles(
       }
     }
   }
+
+  await dropSnapshotsForSeriesCards(snapshots);
 
   const rows = await bulkUpsert({
     table: 'public.price_history',
