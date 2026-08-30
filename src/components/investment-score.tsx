@@ -49,7 +49,12 @@ export function InvestmentScoreWidget({
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Investment score</CardTitle>
+        <CardTitle className="text-base">
+          Investment score
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            demand 50% · scarcity 20% · stability 30%
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">

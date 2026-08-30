@@ -108,9 +108,7 @@ export default async function CardPage({
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Demand durability
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Composite {analytics.composite_score?.toFixed(0) ?? '—'}/100
-                </p>
+                <p className="text-xs text-muted-foreground">S+ to F</p>
               </div>
               <GradeBadge grade={analytics.investment_grade} size="lg" />
             </div>

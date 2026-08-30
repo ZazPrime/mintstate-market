@@ -94,7 +94,11 @@ export function ValuationBreakdown({ drivers }: { drivers: ValuationDrivers }) {
           <Driver
             label="Gem rate economics"
             value={gemRate === null ? '—' : `${(gemRate * 100).toFixed(1)}%`}
-            detail={`Gem-adjusted value ${formatCurrency(drivers.gem_adjusted_value)}`}
+            detail={
+              gemRate === null
+                ? 'No population snapshot for a gem-adjusted value'
+                : `Gem-adjusted value ${formatCurrency(drivers.gem_adjusted_value)}`
+            }
             hint={`${formatCompact(drivers.pop_total)} graded; each raw submission is worth the PSA 10 price times the gem rate.`}
             meter={gemRate === null ? undefined : gemRate * 100}
           />
