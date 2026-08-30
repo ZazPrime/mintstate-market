@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 5%;
+    --foreground: 210 20% 96%;
+    --card: 222 40% 8%;
+    --card-foreground: 210 20% 96%;
+    --popover: 222 44% 7%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 160 84% 45%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 222 28% 13%;
+    --muted-foreground: 215 16% 62%;
+    --accent: 190 90% 45%;
+    --accent-foreground: 222 47% 6%;
+    --destructive: 0 72% 55%;
+    --border: 220 24% 16%;
+    --input: 220 24% 16%;
+    --ring: 160 84% 45%;
+    --chart-1: 160 84% 45%;
+    --chart-2: 199 89% 58%;
+    --chart-3: 47 96% 58%;
+    --chart-4: 340 82% 62%;
+    --chart-5: 265 84% 68%;
+    --radius: 0.6rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'tnum' 1, 'cv02' 1;
+  }
+  /* Numeric columns stay aligned in the dense data tables. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .grid-bg {
+    background-image:
+      radial-gradient(circle at 15% -10%, hsl(160 84% 45% / 0.12), transparent 45%),
+      radial-gradient(circle at 85% 0%, hsl(199 89% 58% / 0.1), transparent 40%);
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+}
